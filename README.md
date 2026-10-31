@@ -216,3 +216,31 @@ System.Windows.Forms 与 Windows.Media（WinRT），没有任何第三方 DLL。
     SettingsForm.cs  设置窗口（含桌面歌词页）
     SelfTest.cs      音频引擎自检
     Program.cs       程序入口、单实例保护、异常日志
+
+## 十一、发布到 GitHub（维护者用）
+
+仓库已经初始化（分支 main，标签 v1.0.0），并附带一键发布脚本。
+
+双击 发布到GitHub.bat，按提示输入：
+
+1. GitHub 用户名
+2. 仓库名（直接回车使用默认的 light-music-player）
+3. 仓库是否私有
+4. Personal Access Token（在 https://github.com/settings/tokens 生成，勾选 repo 权限即可）
+
+脚本会自动完成整条链路：创建仓库 → 提交并推送 main → 推送标签 v1.0.0 → 创建 Release
+→ 上传 dist 目录里的 MusicPlayer-1.0.0-portable.zip，最后打印仓库与 Release 地址。
+
+说明：
+
+* 浏览器里保存的密码无法（也不应该）被脚本读取，因此用 Token 方式，Token 只在本次运行内存里使用，
+  不会写进 .git/config。
+* 用户数据不会被提交：MusicPlayer.config.json、MusicPlayer.cache.json、MusicPlayer.error.log
+  以及 dist/ 都在 .gitignore 里。
+* 也可以手动完成：
+
+      git remote add origin https://github.com/<用户名>/<仓库>.git
+      git push -u origin main
+      git push origin v1.0.0
+
+  然后到网页上 New release，选择标签 v1.0.0，把 dist 里的 zip 拖上去即可。
