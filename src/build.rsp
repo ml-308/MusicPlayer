@@ -1,0 +1,17 @@
+/nologo
+/target:winexe
+/out:..\MusicPlayer.exe
+/win32icon:app.ico
+/win32manifest:app.manifest
+/optimize+
+/r:System.dll
+/r:System.Core.dll
+/r:System.Drawing.dll
+/r:System.Windows.Forms.dll
+/r:System.Runtime.dll
+/r:C:\Windows\Microsoft.NET\assembly\GAC_MSIL\System.Runtime.InteropServices.WindowsRuntime\v4.0_4.0.0.0__b03f5f7f11d50a3a\System.Runtime.InteropServices.WindowsRuntime.dll
+/r:C:\Windows\Microsoft.NET\assembly\GAC_MSIL\System.Runtime.WindowsRuntime\v4.0_4.0.0.0__b77a5c561934e089\System.Runtime.WindowsRuntime.dll
+/r:C:\Windows\System32\WinMetadata\Windows.Foundation.winmd
+/r:C:\Windows\System32\WinMetadata\Windows.Media.winmd
+/r:C:\Windows\System32\WinMetadata\Windows.Storage.winmd
+*.cs

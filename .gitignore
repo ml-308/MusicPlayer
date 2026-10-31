@@ -1,0 +1,21 @@
+# 用户数据（本地运行产生，不要提交）
+MusicPlayer.config.json
+MusicPlayer.cache.json
+MusicPlayer.error.log
+
+# 发布产物
+dist/
+*.zip
+
+# 系统/IDE
+Thumbs.db
+desktop.ini
+.vs/
+*.user
+*.suo
+
+# 临时
+_lyrtest/
+_test/
+_shot/
+*.bak
