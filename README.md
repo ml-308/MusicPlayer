@@ -57,14 +57,21 @@
     ├─ 彻底去弹窗.bat             弹窗处理工具（清除下载标记 / 关闭应用检查 / 打开设置页 / 恢复）
     ├─ fix_popup.ps1              （上面 bat 调用的脚本，请与 bat 放在一起）
     ├─ README.md                  本说明
-    └─ src/                       全部源代码 + 一键重新编译脚本
-       ├─ build.bat               重新编译（双击即可）
-       ├─ build.rsp               编译参数
-       ├─ app.ico / app.manifest  程序图标、DPI 与权限清单
-       └─ *.cs                    源代码
-                                  Program / MainForm / SettingsForm / Lyrics /
-                                  LyricsForm / Audio / Tags / Library / Playlist /
-                                  Theme / Config / SelfTest
+    ├─ src/                       全部源代码 + 一键重新编译脚本
+    │  ├─ build.bat               重新编译主程序（双击即可）
+    │  ├─ build.rsp               编译参数
+    │  ├─ app.ico / app.manifest  程序图标、DPI 与权限清单
+    │  └─ *.cs                    源代码（Program / MainForm / SettingsForm /
+    │                             Lyrics / LyricsForm / Audio / Tags / Library /
+    │                             Playlist / Theme / Config / SelfTest）
+    ├─ setup/                     安装器源代码
+    │  ├─ Installer.cs            安装/卸载逻辑（解包、快捷方式、注册卸载信息）
+    │  ├─ SetupForm.cs            安装向导界面与程序入口
+    │  ├─ build-setup.bat         编译安装器（双击即可）
+    │  └─ build-setup.rsp         编译参数
+    └─ dist/                      发布产物（不进 Git）
+       ├─ MusicPlayer-1.0.0-portable.zip   免安装便携包
+       └─ MusicPlayerSetup.exe             安装包
 
 首次运行会在程序目录生成：
 
@@ -73,6 +80,24 @@
     MusicPlayer.error.log     只在出现异常时生成
 
 已经添加过音乐文件夹的话，这两个 json 里存着你的曲库与上次的播放进度，请不要删除。
+
+### 安装版（MusicPlayerSetup.exe）
+
+双击 dist 目录里的 MusicPlayerSetup.exe（或者从 GitHub Releases 下载），安装向导会：
+
+1. 让你选择安装位置；默认是 %LOCALAPPDATA%\Programs\LightMusicPlayer，**不需要管理员权限**
+2. 可选：创建桌面快捷方式、开始菜单快捷方式、安装完成后启动播放器
+3. 安装完成后会在 Windows 的「已安装的应用」里登记，可以随时卸载
+
+安装包里已经带了便携版的全部文件（主程序 + 源码 + 文档 + 启动/去弹窗脚本）。卸载会删除
+程序文件与快捷方式，不会影响你的音乐文件。
+
+命令行参数（脚本化安装）：
+
+    MusicPlayerSetup.exe /silent                静默安装到默认位置
+    MusicPlayerSetup.exe /silent /dir=D:\App    静默安装到指定目录
+    MusicPlayerSetup.exe /silent /nodesktop /nostartmenu  不创建快捷方式
+    "<安装目录>\Uninstall.exe" /uninstall /silent        静默卸载
 
 ## 三、桌面歌词
 
@@ -229,14 +254,14 @@ System.Windows.Forms 与 Windows.Media（WinRT），没有任何第三方 DLL。
 4. Personal Access Token（在 https://github.com/settings/tokens 生成，勾选 repo 权限即可）
 
 脚本会自动完成整条链路：创建仓库 → 提交并推送 main → 推送标签 v1.0.0 → 创建 Release
-→ 上传 dist 目录里的 MusicPlayer-1.0.0-portable.zip，最后打印仓库与 Release 地址。
+→ 上传 dist 目录里的 MusicPlayer-1.0.0-portable.zip 和 MusicPlayerSetup.exe，最后打印仓库与 Release 地址。
 
 说明：
 
 * 浏览器里保存的密码无法（也不应该）被脚本读取，因此用 Token 方式，Token 只在本次运行内存里使用，
   不会写进 .git/config。
-* 用户数据不会被提交：MusicPlayer.config.json、MusicPlayer.cache.json、MusicPlayer.error.log
-  以及 dist/ 都在 .gitignore 里。
+* 仓库只提交源码与文档；生成出来的 MusicPlayer.exe、安装包和 dist/ 都在 .gitignore 里，
+  统一通过 Release 分发。用户数据（config/cache/error.log）同样不提交。
 * 也可以手动完成：
 
       git remote add origin https://github.com/<用户名>/<仓库>.git

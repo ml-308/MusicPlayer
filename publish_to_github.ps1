@@ -4,6 +4,7 @@ $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $dir
 $Version = '1.0.0'
 $ZipPath = Join-Path $dir ('dist\MusicPlayer-' + $Version + '-portable.zip')
+$SetupPath = Join-Path $dir 'dist\MusicPlayerSetup.exe'
 $NL = [Environment]::NewLine
 
 function Step($t) { Write-Host ''; Write-Host ('== ' + $t + ' ==') -ForegroundColor Cyan }
@@ -21,9 +22,10 @@ $git = Get-Command git -ErrorAction SilentlyContinue
 if (-not $git) { Die '未找到 git，请先安装 Git for Windows' }
 Ok 'git 已安装'
 if (-not (Test-Path -LiteralPath $ZipPath)) {
-    Die ('没有找到发布包：' + $ZipPath + '（请先在 src 目录运行 build.bat 生成 exe，再用 dist 打包）')
+    Die ('没有找到便携包：' + $ZipPath + '（请先运行 src\build.bat 生成 exe，并打包到 dist）')
 }
-Ok ('发布包：' + $ZipPath)
+Ok ('便携包：' + $ZipPath)
+if (Test-Path -LiteralPath $SetupPath) { Ok ('安装包：' + $SetupPath) } else { Warn '未找到安装包，本次只上传便携包' }
 
 Step 'GitHub 账号信息'
 Write-Host '  提示：浏览器里保存的密码无法（也不应该）被脚本读取。'
@@ -114,10 +116,13 @@ $bodyLines = @(
     '- 支持 MP3 / WAV / WMA / FLAC / M4A / AAC / OGG / Opus / AIFF / APE',
     '- 托盘控制、定时停止、m3u 导入导出、封面显示',
     '',
+    '## 下载',
+    '- **MusicPlayerSetup.exe** —— 安装版（推荐）：自动创建桌面与开始菜单快捷方式，可在系统「已安装的应用」中卸载',
+    '- **MusicPlayer-' + $Version + '-portable.zip** —— 免安装便携版：解压后双击 启动播放器.bat 即可',
+    '',
     '## 使用',
-    '1. 下载 MusicPlayer-' + $Version + '-portable.zip 并解压',
-    '2. 双击 启动播放器.bat 运行（可绕过 SmartScreen 对未签名程序的拦截提示）',
-    '3. 也可以直接双击 MusicPlayer.exe',
+    '1. 安装版：双击 MusicPlayerSetup.exe，按向导完成安装',
+    '2. 便携版：解压后双击 启动播放器.bat 运行（可绕过 SmartScreen 对未签名程序的拦截提示）',
     '',
     '## 说明',
     '- 首次运行生成的 config/cache 只保存在程序目录，不联网、不写注册表',
@@ -141,15 +146,21 @@ try {
     } else { Die ('创建 Release 失败：' + $_.Exception.Message) }
 }
 
-Step '上传发布包'
-$upload = $rel.upload_url -replace '\{.*\}', ''
-$upload = $upload + '?name=' + [IO.Path]::GetFileName($ZipPath)
-try {
-    Invoke-RestMethod -Uri $upload -Headers $hdr -Method Post -ContentType 'application/zip' -InFile $ZipPath -TimeoutSec 300 | Out-Null
-    Ok ('已上传 MusicPlayer-' + $Version + '-portable.zip')
-} catch {
-    if ($_.Exception.Message -match '422') { Warn '同名附件已存在，跳过上传' }
-    else { Warn ('上传失败：' + $_.Exception.Message) }
+Step '上传发布文件'
+$uploadBase = $rel.upload_url -replace '\{.*\}', ''
+$assets = @()
+$assets += @{ P = $ZipPath; T = 'application/zip' }
+if (Test-Path -LiteralPath $SetupPath) { $assets += @{ P = $SetupPath; T = 'application/octet-stream' } }
+foreach ($a in $assets) {
+    $name = [IO.Path]::GetFileName($a.P)
+    $url = $uploadBase + '?name=' + $name
+    try {
+        Invoke-RestMethod -Uri $url -Headers $hdr -Method Post -ContentType $a.T -InFile $a.P -TimeoutSec 600 | Out-Null
+        Ok ('已上传 ' + $name)
+    } catch {
+        if ($_.Exception.Message -match '422') { Warn ($name + ' 已存在，跳过') }
+        else { Warn ('上传 ' + $name + ' 失败：' + $_.Exception.Message) }
+    }
 }
 
 Write-Host ''
