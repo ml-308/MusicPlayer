@@ -64,7 +64,7 @@ if ($DryRun) {
     Ok '演练结束（未联网）。真实执行时会：'
     Write-Host ('     1) 创建/复用仓库 https://github.com/' + $user + '/' + $repo)
     Write-Host ('     2) git push 到 main，并推送标签 v' + $Version)
-    Write-Host ('     3) 创建 Release v' + $Version + ' 并上传 portable.zip')
+    Write-Host ('     3) 创建 Release v' + $Version + ' 并上传便携包与安装包 (setup.exe)')
     Write-Host ''
     Read-Host '按回车退出'
     exit 0
