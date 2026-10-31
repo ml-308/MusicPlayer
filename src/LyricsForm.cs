@@ -105,9 +105,33 @@ namespace MusicPlayer
             Opacity = v / 100.0;
         }
 
+        int DetectDpi()
+        {
+            try
+            {
+                if (IsHandleCreated)
+                {
+                    using (Graphics g = CreateGraphics())
+                    {
+                        int d = (int)Math.Round(g.DpiX);
+                        if (d >= 72 && d <= 480) return d;
+                    }
+                }
+            }
+            catch { }
+            try { int d = DeviceDpi; if (d >= 72 && d <= 480) return d; } catch { }
+            return 96;
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ApplyGeometry();
+        }
+
         public void ApplyGeometry()
         {
-            try { Sf = DeviceDpi; } catch { Sf = 96; }
+            Sf = DetectDpi();
             if (Sf <= 0) Sf = 96;
             Rectangle wa = Screen.PrimaryScreen.WorkingArea;
             int w = Math.Min(S(1080), wa.Width - S(120));

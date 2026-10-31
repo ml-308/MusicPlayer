@@ -62,7 +62,7 @@ namespace MusicPlayer
             ForeColor = T.Text;
             Font = T.BaseFont;
             AutoScaleMode = AutoScaleMode.None;
-            MinimumSize = new Size(S(720), S(460));
+            MinimumSize = new Size(S(820), S(540));
             StartPosition = FormStartPosition.CenterScreen;
             AllowDrop = true;
             KeyPreview = true;
@@ -428,6 +428,10 @@ namespace MusicPlayer
             listMenu.Items.Add("复制文件路径", null, delegate(object s, EventArgs e) { CopyPaths(); });
             listMenu.Items.Add(new ToolStripSeparator());
             listMenu.Items.Add("歌曲属性", null, delegate(object s, EventArgs e) { ShowProperties(); });
+            listMenu.Items.Add(new ToolStripSeparator());
+            listMenu.Items.Add("随机打乱列表", null, delegate(object s, EventArgs e) { ShuffleList(); });
+            listMenu.Items.Add("导入播放列表 (m3u)", null, delegate(object s, EventArgs e) { ImportPlaylist(); });
+            listMenu.Items.Add("导出播放列表 (m3u)", null, delegate(object s, EventArgs e) { ExportPlaylist(); });
             list.ContextMenuStrip = listMenu;
         }
 
@@ -500,40 +504,51 @@ namespace MusicPlayer
         void LayoutAll()
         {
             if (topBar == null) return;
-            try { Sf = DeviceDpi; } catch { Sf = 96; }
+            Sf = DetectDpi();
             if (Sf <= 0) Sf = 96;
+            Size ms2 = new Size(S(820), S(540));
+            if (MinimumSize != ms2) MinimumSize = ms2;
+            ApplyMetrics();
 
             int y = S(8);
-            int x = S(10);
             int gap = S(6);
+
+            // ---- 顶栏：设置按钮先靠右，左侧按钮空间不足时自动收起次要项 ----
+            btnSettings.Location = new Point(Math.Max(S(10), topBar.Width - btnSettings.Width - S(10)), y);
+            int searchMax = S(230), searchMin = S(120);
+            int searchRight = btnSettings.Left - S(10);
+
+            int x = S(10);
             btnAddFolder.Location = new Point(x, y); x += btnAddFolder.Width + gap;
             btnAddFiles.Location = new Point(x, y); x += btnAddFiles.Width + gap;
             btnRemove.Location = new Point(x, y); x += btnRemove.Width + gap;
             btnClear.Location = new Point(x, y); x += btnClear.Width + gap;
-            btnImport.Location = new Point(x, y); x += btnImport.Width + gap;
-            btnExport.Location = new Point(x, y); x += btnExport.Width + gap;
-            btnSortShuffle.Location = new Point(x, y); x += btnSortShuffle.Width + gap;
 
-            int sw = S(240);
-            btnSettings.Location = new Point(topBar.Width - btnSettings.Width - S(10), y);
-            searchPanel.Location = new Point(btnSettings.Left - sw - S(10), y + S(2));
+            int optNeed = btnImport.Width + gap + btnExport.Width + gap + btnSortShuffle.Width;
+            bool showOptional = (searchRight - x - optNeed - S(8)) >= searchMin;
+            btnImport.Visible = showOptional;
+            btnExport.Visible = showOptional;
+            btnSortShuffle.Visible = showOptional;
+            if (showOptional)
+            {
+                btnImport.Location = new Point(x, y); x += btnImport.Width + gap;
+                btnExport.Location = new Point(x, y); x += btnExport.Width + gap;
+                btnSortShuffle.Location = new Point(x, y); x += btnSortShuffle.Width + gap;
+            }
+
+            int sw = Math.Max(searchMin, Math.Min(searchMax, searchRight - x - S(6)));
+            searchPanel.Location = new Point(searchRight - sw, y + S(2));
             searchPanel.Size = new Size(sw, S(26));
             lblSearchIcon.Location = new Point(0, 0);
-            lblSearchIcon.Size = new Size(S(24), S(24));
+            lblSearchIcon.Size = new Size(S(22), S(24));
             txtSearch.Location = new Point(S(24), S(4));
-            txtSearch.Width = sw - S(30);
+            txtSearch.Width = Math.Max(S(50), sw - S(32));
 
-            // 底部
-            int bh = bottomBar.Height;
+            // ---- 底栏 ----
             int cy = S(10);
             cover.Location = new Point(S(12), cy);
             cover.Size = new Size(S(64), S(64));
-
             int lx = cover.Right + S(12);
-            lblTitle.Location = new Point(lx, cy + S(2));
-            lblTitle.Size = new Size(S(250), S(26));
-            lblInfo.Location = new Point(lx, cy + S(30));
-            lblInfo.Size = new Size(S(250), S(20));
 
             int right = bottomBar.Width - S(12);
             int cyb = cy + S(14);
@@ -542,14 +557,39 @@ namespace MusicPlayer
             btnPlay.Location = new Point(right - btnPlay.Width, cyb - S(6)); right = btnPlay.Left - S(6);
             btnPrev.Location = new Point(right - btnPrev.Width, cyb); right = btnPrev.Left - S(6);
             btnMode.Location = new Point(right - btnMode.Width, cyb); right = btnMode.Left - S(6);
-            btnLyrics.Location = new Point(Math.Max(S(10), right - btnLyrics.Width), cyb + S(6));
-            right = btnLyrics.Left - S(10);
+            btnLyrics.Location = new Point(right - btnLyrics.Width, cyb + S(6)); right = btnLyrics.Left - S(12);
 
-            lblVolume.Location = new Point(right - S(40), cyb + S(6));
+            // 音量区：空间不足时先缩短滑条，再隐藏静音图标与数值
+            int sliderW = S(116);
+            int labelMin = S(130);
+            btnMute.Visible = true;
+            lblVolume.Visible = true;
+            int volNeed = S(4) + btnMute.Width + S(4) + sliderW + S(6) + S(40);
+            if (right - lx - volNeed < labelMin)
+            {
+                sliderW = S(116) - (labelMin - (right - lx - volNeed));
+                if (sliderW < S(60)) sliderW = S(60);
+                volNeed = S(4) + btnMute.Width + S(4) + sliderW + S(6) + S(40);
+                if (right - lx - volNeed < S(80))
+                {
+                    btnMute.Visible = false;
+                    lblVolume.Visible = false;
+                    volNeed = sliderW;
+                }
+            }
+            int volLeft = right - volNeed;
+            btnMute.Location = new Point(volLeft, cyb + S(2));
+            volBar.Size = new Size(sliderW, S(22));
+            volBar.Location = new Point(btnMute.Visible ? btnMute.Right + S(4) : volLeft, cyb + S(4));
+            lblVolume.Location = new Point(volBar.Right + S(6), cyb + S(6));
             lblVolume.Size = new Size(S(40), S(20));
-            volBar.Location = new Point(lblVolume.Left - S(116), cyb + S(4));
-            volBar.Size = new Size(S(116), S(22));
-            btnMute.Location = new Point(volBar.Left - btnMute.Width - S(4), cyb + S(2));
+
+            // 歌曲信息标签宽度跟随可用空间，避免与右侧控件重叠
+            int labelW = Math.Max(S(90), volLeft - lx - S(10));
+            lblTitle.Location = new Point(lx, cy + S(2));
+            lblTitle.Size = new Size(labelW, S(26));
+            lblInfo.Location = new Point(lx, cy + S(30));
+            lblInfo.Size = new Size(labelW, S(20));
 
             int row2y = cy + S(72);
             lblPos.Location = new Point(S(12), row2y + S(2));
@@ -565,6 +605,87 @@ namespace MusicPlayer
             lblStatusMid.Size = new Size(statusBar.Width / 3, statusBar.Height);
             lblStatusRight.Location = new Point(statusBar.Width * 2 / 3, 0);
             lblStatusRight.Size = new Size(statusBar.Width / 3 - S(10), statusBar.Height);
+            FitColumns();
+        }
+
+        // DPI 确定后重算所有固定尺寸（构造时按 96 DPI 算的会偏小，导致文字被裁）
+        void ApplyMetrics()
+        {
+            if (topBar.Height != S(46)) topBar.Height = S(46);
+            if (bottomBar.Height != S(108)) bottomBar.Height = S(108);
+            if (statusBar.Height != S(26)) statusBar.Height = S(26);
+            if (searchPanel.Height != S(26)) searchPanel.Height = S(26);
+
+            SizeSize(btnAddFolder, 128, 30); SizeSize(btnAddFiles, 104, 30);
+            SizeSize(btnRemove, 76, 30); SizeSize(btnClear, 76, 30);
+            SizeSize(btnImport, 96, 30); SizeSize(btnExport, 96, 30);
+            SizeSize(btnSortShuffle, 96, 30); SizeSize(btnSettings, 88, 30);
+
+            SizeSize(btnPrev, 48, 40); SizeSize(btnStop, 48, 40);
+            SizeSize(btnNext, 48, 40); SizeSize(btnMode, 48, 40);
+            SizeSize(btnPlay, 60, 52); SizeSize(btnMute, 42, 34);
+            SizeSize(btnLyrics, 46, 26);
+
+            if (cover.Width != S(64)) cover.Size = new Size(S(64), S(64));
+            try
+            {
+                if (list.SmallImageList != null && list.SmallImageList.ImageSize.Height != S(27))
+                {
+                    list.SmallImageList.ImageSize = new Size(1, S(27));
+                    list.Invalidate();
+                }
+            }
+            catch { }
+        }
+
+        void SizeSize(Control c, int w, int h)
+        {
+            if (c == null) return;
+            int nw = S(w), nh = S(h);
+            if (c.Width != nw || c.Height != nh) c.Size = new Size(nw, nh);
+        }
+
+        // 列表列宽按窗口宽度自适应，保证最后一列不会被挤出去
+        void FitColumns()
+        {
+            if (list == null || list.Columns.Count < 9) return;
+            int avail = list.ClientSize.Width;
+            if (avail <= 0) return;
+            double[] weight = new double[] { 44, 260, 150, 150, 70, 58, 78, 78, 300 };
+            int[] min = new int[] { S(34), S(120), S(72), S(70), S(50), S(42), S(56), S(56), S(90) };
+            double totalW = 0;
+            int sumMin = 0;
+            for (int i = 0; i < 9; i++) { totalW += weight[i]; sumMin += min[i]; }
+            int extra = avail - sumMin;
+            if (extra < 0) extra = 0;
+            int used = 0;
+            for (int i = 0; i < 9; i++)
+            {
+                int v = min[i] + (int)Math.Round(extra * (weight[i] / totalW));
+                if (i == 8) v = Math.Max(min[i], avail - used);
+                list.Columns[i].Width = v;
+                used += v;
+            }
+        }
+
+        static int DetectDpiStatic() { return 96; }
+
+        int DetectDpi()
+        {
+            try
+            {
+                if (IsHandleCreated)
+                {
+                    using (Graphics g = CreateGraphics())
+                    {
+                        int d = (int)Math.Round(g.DpiX);
+                        if (d >= 72 && d <= 480) return d;
+                    }
+                }
+            }
+            catch { }
+            try { int d = DeviceDpi; if (d >= 72 && d <= 480) return d; } catch { }
+            return 96;
         }
 
         void ApplySettingsToUI()
