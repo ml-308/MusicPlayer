@@ -32,10 +32,27 @@ Write-Host '  提示：浏览器里保存的密码无法（也不应该）被脚
 Write-Host '        请打开 https://github.com/settings/tokens 生成 Personal Access Token，'
 Write-Host '        勾选 repo 权限即可，下面粘贴（输入时不显示）。'
 Write-Host ''
-$user = Read-Host '  GitHub 用户名'
-if (-not $user) { Die '用户名不能为空' }
-$repoIn = Read-Host '  仓库名（直接回车使用 light-music-player）'
-$repo = if ($repoIn) { $repoIn } else { 'light-music-player' }
+$defUser = ''
+$defRepo = 'MusicPlayer'
+try {
+    $u = (& git remote get-url origin 2>$null) -join ''
+    if ($u -match 'github\.com[:/]([^/]+)/(.+?)(\.git)?$') {
+        $defUser = $Matches[1]
+        $defRepo = ($Matches[2] -replace '\.git$', '')
+    }
+} catch { }
+
+if ($defUser) {
+    $user = Read-Host ('  GitHub 用户名（回车使用 ' + $defUser + '）')
+    if (-not $user) { $user = $defUser }
+} else {
+    while (-not $user) {
+        $user = Read-Host '  GitHub 用户名'
+        if (-not $user) { Write-Host '  用户名不能为空，请重新输入。' -ForegroundColor Yellow }
+    }
+}
+$repoIn = Read-Host ('  仓库名（回车使用 ' + $defRepo + '）')
+$repo = if ($repoIn) { $repoIn } else { $defRepo }
 $private = (Read-Host '  仓库是否私有？(y/N)') -match '^[Yy]'
 
 if ($DryRun) {
