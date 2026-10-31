@@ -242,30 +242,24 @@ System.Windows.Forms 与 Windows.Media（WinRT），没有任何第三方 DLL。
     SelfTest.cs      音频引擎自检
     Program.cs       程序入口、单实例保护、异常日志
 
-## 十一、发布到 GitHub（维护者用）
+## 十一、发布新版本（维护者用）
 
-仓库已经初始化（分支 main，标签 v1.0.0），并附带一键发布脚本。
+仓库只提交源码与文档；生成出来的 MusicPlayer.exe、安装包与 dist/ 都在 .gitignore 里，
+统一通过 Release 分发。用户数据（config/cache/error.log）同样不提交。
 
-双击 发布到GitHub.bat，按提示输入：
+发布步骤：
 
-1. GitHub 用户名
-2. 仓库名（直接回车使用默认的 light-music-player）
-3. 仓库是否私有
-4. Personal Access Token（在 https://github.com/settings/tokens 生成，勾选 repo 权限即可）
+1. 本地修改后提交、打标签并推送：
 
-脚本会自动完成整条链路：创建仓库 → 提交并推送 main → 推送标签 v1.0.0 → 创建 Release
-→ 上传 dist 目录里的 MusicPlayer-1.0.0-portable.zip 和 MusicPlayerSetup.exe，最后打印仓库与 Release 地址。
+      git add -A
+      git commit -m "release: v1.0.1"
+      git tag v1.0.1
+      git push origin main
+      git push origin v1.0.1
 
-说明：
+2. 打包产物：双击 src\build.bat 编译主程序，再双击 setup\build-setup.bat 生成安装包，
+   得到 dist/ 下的 MusicPlayer-<版本>-portable.zip 与 MusicPlayerSetup.exe。
+3. 在 GitHub 网页 New release 里选择新标签，把 dist 里的两个文件拖上去即可。
 
-* 浏览器里保存的密码无法（也不应该）被脚本读取，因此用 Token 方式，Token 只在本次运行内存里使用，
-  不会写进 .git/config。
-* 仓库只提交源码与文档；生成出来的 MusicPlayer.exe、安装包和 dist/ 都在 .gitignore 里，
-  统一通过 Release 分发。用户数据（config/cache/error.log）同样不提交。
-* 也可以手动完成：
-
-      git remote add origin https://github.com/<用户名>/<仓库>.git
-      git push -u origin main
-      git push origin v1.0.0
-
-  然后到网页上 New release，选择标签 v1.0.0，把 dist 里的 zip 拖上去即可。
+> 主程序与安装包都没有代码签名，用户首次运行时可能出现 SmartScreen 提示，
+> 解决办法见本文第一节。
