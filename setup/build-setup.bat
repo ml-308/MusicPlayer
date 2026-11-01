@@ -18,4 +18,7 @@ if errorlevel 1 (
   exit /b 1
 )
 echo [完成] 已生成 ..\dist\MusicPlayerSetup.exe
+rem === 代码签名：彻底消除 SmartScreen「无法识别的应用」（未配置证书时自动跳过） ===
+rem 注意：安装包内嵌便携包，请先重新打包便携包（含已签名的 MusicPlayer.exe）再编译本安装器。
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\sign.ps1" -Path "%~dp0..\dist\MusicPlayerSetup.exe"
 pause

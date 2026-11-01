@@ -200,8 +200,8 @@ namespace MusicPlayerSetup
                 }
                 if (launch)
                 {
-                    try { System.Diagnostics.Process.Start(Path.Combine(dir, "启动播放器.bat")); }
-                    catch { try { System.Diagnostics.Process.Start(exe); } catch { } }
+                    try { System.Diagnostics.Process.Start(exe); }
+                    catch { }
                 }
                 return 0;
             }

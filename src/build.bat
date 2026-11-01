@@ -17,4 +17,6 @@ if errorlevel 1 (
   exit /b 1
 )
 echo [完成] 已生成 ..\MusicPlayer.exe
+rem === 代码签名：彻底消除 SmartScreen「无法识别的应用」（未配置证书时自动跳过） ===
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\sign.ps1" -Path "%~dp0..\MusicPlayer.exe"
 pause
