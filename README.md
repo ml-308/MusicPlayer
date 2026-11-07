@@ -13,7 +13,7 @@
 
 * **根因**：`.exe` 没有数字签名，SmartScreen 按"未知发布者"拦截。
 * **正解**：对 `.exe` 做 Authenticode 数字签名。仓库已接入签名流程（`sign.ps1`，在
-  `src\build.bat` / `setup\build-setup.bat` 编译完成后**自动调用**）。
+  `src\build.bat` 编译完成后、以及 `build-setup.cmd` 产出安装包后调用）。
 
 ### 以前那些 .bat 为什么被移除
 
@@ -34,7 +34,7 @@
     :: 方式一：PFX 文件（推荐）
     set CODESIGN_PFX=你的证书.pfx
     set CODESIGN_PASSWORD=证书密码
-    :: 然后双击 src\build.bat / setup\build-setup.bat 即可自动签名
+    :: 然后双击 src\build.bat 重建主程序、build-setup.cmd 重打安装包即可自动签名
 
     # 方式二：证书已导入"个人"证书存储，按指纹指定
     powershell -ExecutionPolicy Bypass -File sign.ps1 -Thumbprint A1B2C3...
@@ -61,14 +61,15 @@
     │  └─ *.cs                    源代码（Program / MainForm / SettingsForm /
     │                             Lyrics / LyricsForm / Audio / Tags / Library /
     │                             Playlist / Theme / Config / SelfTest）
-    ├─ setup/                     安装器源代码
-    │  ├─ Installer.cs            安装/卸载逻辑（解包、快捷方式、注册卸载信息）
-    │  ├─ SetupForm.cs            安装向导界面与程序入口
-    │  ├─ build-setup.bat         编译安装器（编译后自动签名）
-    │  └─ build-setup.rsp         编译参数
+    ├─ installer/                 安装程序（Inno Setup 6）
+    │  ├─ setup.iss               应用身份与文件清单（按应用唯一要改的文件）
+    │  ├─ common.iss              统一向导：页面顺序、任务项、文案、卸载行为
+    │  ├─ ChineseSimplified.isl   简体中文语言包
+    │  └─ assets/wizard-small.png 向导头图（由 app.ico 生成）
+    ├─ build-setup.cmd            只重编安装包（Inno Setup 6）
     └─ dist/                      发布产物（不进 Git）
-       ├─ MusicPlayer-1.0.0-portable.zip   免安装便携包（已含签名主程序）
-       └─ MusicPlayerSetup.exe             安装包（已签名）
+       ├─ MusicPlayer-1.0.0-portable.zip          免安装便携包（已含签名主程序）
+       └─ MusicPlayer-Setup-1.1.0.exe             安装包（已签名）
 
 首次运行会在程序目录生成：
 
@@ -78,23 +79,29 @@
 
 已经添加过音乐文件夹的话，这两个 json 里存着你的曲库与上次的播放进度，请不要删除。
 
-### 安装版（MusicPlayerSetup.exe）
+### 安装版（MusicPlayer-Setup-1.1.0.exe）
 
-双击 dist 目录里的 MusicPlayerSetup.exe（或者从 GitHub Releases 下载），安装向导会：
+从 GitHub Releases 下载安装包，Inno Setup 6 构建的向导式安装流程：
 
-1. 让你选择安装位置；默认是 %LOCALAPPDATA%\Programs\LightMusicPlayer，**不需要管理员权限**
-2. 可选：创建桌面快捷方式、开始菜单快捷方式、安装完成后启动播放器
-3. 安装完成后会在 Windows 的「已安装的应用」里登记，可以随时卸载
+**欢迎 → 许可协议 → 安装位置 → 附加任务 → 准备安装 → 安装进度 → 完成**
+（简体中文 / English 随系统语言自动匹配）
 
-安装包里已经带了便携版的全部文件（主程序 + 文档）。卸载会删除
-程序文件与快捷方式，不会影响你的音乐文件。
+1. 安装位置默认 `%LOCALAPPDATA%\Programs\LightMusicPlayer`，可改；**不需要管理员权限**
+2. 附加任务：创建桌面快捷方式（默认勾）、创建开始菜单快捷方式（默认勾）
+3. 完成页可直接勾选「立即运行」
+4. 安装后在 Windows 的「已安装的应用」里登记，卸载用卸载项或安装目录下的 `unins000.exe`
 
-命令行参数（脚本化安装）：
+安装包里已经带了主程序与文档。卸载只删除程序文件与快捷方式，**不会影响你的音乐文件**。
 
-    MusicPlayerSetup.exe /silent                静默安装到默认位置
-    MusicPlayerSetup.exe /silent /dir=D:\App    静默安装到指定目录
-    MusicPlayerSetup.exe /silent /nodesktop /nostartmenu  不创建快捷方式
-    "<安装目录>\Uninstall.exe" /uninstall /silent        静默卸载
+命令行（脚本化安装，`/TASKS` 控制快捷方式）：
+
+    MusicPlayer-Setup-1.1.0.exe /VERYSILENT /SUPPRESSMSGBOXES
+    MusicPlayer-Setup-1.1.0.exe /VERYSILENT /SUPPRESSMSGBOXES /DIR="D:\App" /TASKS="desktopicon"
+    MusicPlayer-Setup-1.1.0.exe /VERYSILENT /SUPPRESSMSGBOXES /TASKS=""
+    "%LOCALAPPDATA%\Programs\LightMusicPlayer\unins000.exe" /VERYSILENT
+
+> 从 1.0.x 的自绘安装器升级：安装包沿用同一 `AppId` 与同一安装目录，装完会自动删除旧版
+> `uninstall.exe` 与旧卸载注册项，不会在「已安装的应用」里留下两条记录。
 
 ## 三、桌面歌词
 
