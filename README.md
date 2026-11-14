@@ -69,7 +69,7 @@
     ├─ build-setup.cmd            只重编安装包（Inno Setup 6）
     └─ dist/                      发布产物（不进 Git）
        ├─ MusicPlayer-1.0.0-portable.zip          免安装便携包（已含签名主程序）
-       └─ MusicPlayer-Setup-1.1.0.exe             安装包（已签名）
+       └─ MusicPlayer-Setup-1.2.0.exe             安装包（已签名）
 
 首次运行会在程序目录生成：
 
@@ -79,7 +79,7 @@
 
 已经添加过音乐文件夹的话，这两个 json 里存着你的曲库与上次的播放进度，请不要删除。
 
-### 安装版（MusicPlayer-Setup-1.1.0.exe）
+### 安装版（MusicPlayer-Setup-1.2.0.exe）
 
 从 GitHub Releases 下载安装包，Inno Setup 6 构建的向导式安装流程：
 
@@ -95,9 +95,9 @@
 
 命令行（脚本化安装，`/TASKS` 控制快捷方式）：
 
-    MusicPlayer-Setup-1.1.0.exe /VERYSILENT /SUPPRESSMSGBOXES
-    MusicPlayer-Setup-1.1.0.exe /VERYSILENT /SUPPRESSMSGBOXES /DIR="D:\App" /TASKS="desktopicon"
-    MusicPlayer-Setup-1.1.0.exe /VERYSILENT /SUPPRESSMSGBOXES /TASKS=""
+    MusicPlayer-Setup-1.2.0.exe /VERYSILENT /SUPPRESSMSGBOXES
+    MusicPlayer-Setup-1.2.0.exe /VERYSILENT /SUPPRESSMSGBOXES /DIR="D:\App" /TASKS="desktopicon"
+    MusicPlayer-Setup-1.2.0.exe /VERYSILENT /SUPPRESSMSGBOXES /TASKS=""
     "%LOCALAPPDATA%\Programs\LightMusicPlayer\unins000.exe" /VERYSILENT
 
 > 从 1.0.x 的自绘安装器升级：安装包沿用同一 `AppId` 与同一安装目录，装完会自动删除旧版

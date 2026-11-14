@@ -6,8 +6,13 @@ namespace MusicPlayer
     static class Program
     {
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
+            // 「发现新版本」检查：命令行开关 + 无人值守 probe
+            UpdateKit.UpdateCheck.Configure(args);
+            int? probeExit = UpdateKit.UpdateCheck.TryProbe(args);
+            if (probeExit.HasValue) { Environment.ExitCode = probeExit.Value; return; }
+
             bool created = false;
             System.Threading.Mutex mutex = new System.Threading.Mutex(true, "LightMusicPlayer_SingleInstance_Mutex", out created);
             if (!created)
@@ -22,7 +27,9 @@ namespace MusicPlayer
                 AppDomain.CurrentDomain.UnhandledException += delegate(object s, UnhandledExceptionEventArgs e) { LogError(e.ExceptionObject as Exception); };
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new MainForm());
+                MainForm form = new MainForm();
+                UpdateKit.UpdatePrompt.ScheduleAutoCheck(form);
+                Application.Run(form);
             }
             catch (Exception ex)
             {
