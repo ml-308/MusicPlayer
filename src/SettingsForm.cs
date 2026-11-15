@@ -15,6 +15,8 @@ namespace MusicPlayer
         ComboBox cboTheme, cboMode, cboEngine;
         CheckBox chkScanStart, chkRemember, chkCover, chkTray, chkCache, chkRecursive, chkStopAfter;
         CheckBox chkLyrics, chkLyricsLock;
+        CheckBox chkMiniAuto, chkMiniCorner;
+        NumericUpDown numMiniIdle;
         NumericUpDown numVolume, numSeek, numHistory, numSleep, numLyricsSize, numLyricsOpacity;
         ListBox lstFolders, lstExcludes;
         TextBox txtExt, txtEngineResult;
@@ -109,6 +111,7 @@ namespace MusicPlayer
             tabs.TabPages.Add(BuildPlay());
             tabs.TabPages.Add(BuildFolders());
             tabs.TabPages.Add(BuildLyricsPage());
+            tabs.TabPages.Add(BuildMiniPage());
             tabs.TabPages.Add(BuildEngine());
             tabs.TabPages.Add(BuildAbout());
             if (cboTheme != null && themeSel >= 0 && themeSel < cboTheme.Items.Count) cboTheme.SelectedIndex = themeSel;
@@ -403,6 +406,32 @@ namespace MusicPlayer
             return p;
         }
 
+        // ---------------- 迷你模式 ----------------
+        TabPage BuildMiniPage()
+        {
+            TabPage p = NewPage("迷你模式");
+            chkMiniAuto = AddCheck(p, "播放时无操作自动收起为迷你窗", 16, 18, 560, s.MiniAuto);
+            AddLabel(p, "无操作多久后收起", 16, 56, 150);
+            numMiniIdle = AddNum(p, 180, 54, 90, 3, 3600, s.MiniIdleSeconds);
+            AddHint(p, "秒（默认 20 秒；播放中且鼠标键盘均无操作时触发）", 282, 56, 330, 26);
+            chkMiniCorner = AddCheck(p, "收起时贴到屏幕右上角", 16, 90, 400, s.MiniCorner);
+
+            FlatButton resetPos = AddPageButton(p, "复位迷你窗位置", 150, 124, 140, false);
+            resetPos.Click += delegate(object o, EventArgs e)
+            {
+                s.MiniCorner = true;
+                s.MiniX = -1;
+                s.MiniY = -1;
+                chkMiniCorner.Checked = true;
+                MessageBox.Show(this, "已复位，确定后迷你窗会在屏幕右上角出现。", "提示");
+            };
+
+            AddHint(p, "迷你窗只保留封面、曲名、进度条和播放控制。鼠标移入会临时展开完整的一条，移开几秒后自动缩回屏幕边缘；" +
+                       "双击迷你窗、或按 Ctrl+D、或点工具栏「收起」可随时切换。播放停止时不会自动收起。", 16, 168, 590, 72);
+            AddHint(p, "迷你窗可以拖动到任意位置，位置会被记住；右键音量图标可快速选择音量。", 16, 250, 590, 30);
+            return p;
+        }
+
         // ---------------- 引擎 ----------------
         TabPage BuildEngine()
         {
@@ -508,6 +537,10 @@ namespace MusicPlayer
             s.HistoryLength = (int)numHistory.Value;
             s.StopAfterCurrent = chkStopAfter.Checked;
             s.SleepTimerMinutes = (int)numSleep.Value;
+
+            s.MiniAuto = chkMiniAuto.Checked;
+            s.MiniIdleSeconds = (int)numMiniIdle.Value;
+            s.MiniCorner = chkMiniCorner.Checked;
 
             s.LyricsEnabled = chkLyrics.Checked;
             s.LyricsFontSize = (int)numLyricsSize.Value;

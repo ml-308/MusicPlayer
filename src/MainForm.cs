@@ -31,6 +31,19 @@ namespace MusicPlayer
         int sortColumn = 0;
         bool sortAsc = true;
 
+        // ---------- 迷你模式（收起）----------
+        MiniPlayerPanel mini;
+        bool miniMode = false;                 // 当前是否处于迷你态
+        DateTime lastUserAction = DateTime.Now;
+        DateTime miniSince = DateTime.MinValue;
+        DateTime restoredAt = DateTime.MinValue;   // 最近一次“手动还原”的时刻（用于冷静期）
+        Point restoreBoundsLoc;
+        Size restoreBoundsSize;
+        bool restoreMaximized = false;
+        bool miniTopMost = true;
+        System.Windows.Forms.Timer miniTick;   // 空闲检测
+        FlatButton btnMiniToggle;              // 顶栏“收起”按钮
+
         // ---------- 控件 ----------
         Panel topBar, bottomBar, statusBar, searchPanel;
         FlatButton btnAddFolder, btnAddFiles, btnRemove, btnClear, btnSortShuffle, btnSettings;
@@ -93,6 +106,11 @@ namespace MusicPlayer
             timer.Tick += delegate(object s, EventArgs e) { OnTick(); };
             timer.Start();
 
+            miniTick = new System.Windows.Forms.Timer();
+            miniTick.Interval = 1000;
+            miniTick.Tick += delegate(object s, EventArgs e) { CheckIdle(); };
+            miniTick.Start();
+
             cache = TagCache.Load(cachePath);
 
             RestoreWindow();
@@ -101,6 +119,7 @@ namespace MusicPlayer
             DragEnter += OnDragEnter;
             DragDrop += OnDragDrop;
             FormClosing += OnFormClosing;
+            HookActivity(this);
             Resize += delegate(object s, EventArgs e) { LayoutAll(); };
             Shown += delegate(object s, EventArgs e)
             {
@@ -125,6 +144,7 @@ namespace MusicPlayer
                     lyricsForm.BringToFront();
                 }
                 UpdateLyricsButton();
+                BuildMini();
                 if (settings.ScanOnStart && settings.Folders.Count > 0 && allTracks.Count == 0) StartScan();
             };
         }
@@ -170,6 +190,9 @@ namespace MusicPlayer
             btnExport = MakeToolButton(Glyphs.Save, "导出列表", 96);
             btnSortShuffle = MakeToolButton(Glyphs.Shuffle, "随机排序", 96);
             btnSettings = MakeToolButton(Glyphs.Settings, "设置", 88);
+            btnMiniToggle = MakeToolButton(Glyphs.Up, "收起", 76);
+            tips.SetToolTip(btnMiniToggle, "收起为迷你窗（Ctrl+D）");
+            btnMiniToggle.Click += delegate(object s, EventArgs e) { EnterMiniMode(false); };
 
             btnAddFolder.Click += delegate(object s, EventArgs e) { AddFolders(); };
             btnAddFiles.Click += delegate(object s, EventArgs e) { AddFiles(); };
@@ -211,6 +234,7 @@ namespace MusicPlayer
             topBar.Controls.Add(btnExport);
             topBar.Controls.Add(btnSortShuffle);
             topBar.Controls.Add(searchPanel);
+            topBar.Controls.Add(btnMiniToggle);
             topBar.Controls.Add(btnSettings);
 
             // ---- 歌曲列表 ----
@@ -450,6 +474,7 @@ namespace MusicPlayer
             trayMenu.Items.Add("下一首", null, delegate(object s, EventArgs e) { NextTrack(false); });
             trayMenu.Items.Add(new ToolStripSeparator());
             trayMenu.Items.Add("桌面歌词 开/关", null, delegate(object s, EventArgs e) { ToggleLyrics(); });
+            trayMenu.Items.Add("迷你模式 开/关", null, delegate(object s, EventArgs e) { ToggleMiniMode(); });
             trayMenu.Items.Add(new ToolStripSeparator());
             trayMenu.Items.Add("退出", null, delegate(object s, EventArgs e) { QuitApp(); });
             tray.ContextMenuStrip = trayMenu;
@@ -504,10 +529,23 @@ namespace MusicPlayer
         void LayoutAll()
         {
             if (topBar == null) return;
+            if (miniMode)
+            {
+                if (mini != null && !mini.IsDisposed)
+                {
+                    mini.Dock = DockStyle.Fill;
+                    mini.SetDpi(Sf);
+                    mini.RefreshFromHost();
+                }
+                return;
+            }
             Sf = DetectDpi();
             if (Sf <= 0) Sf = 96;
-            Size ms2 = new Size(S(820), S(540));
-            if (MinimumSize != ms2) MinimumSize = ms2;
+            if (!miniMode)
+            {
+                Size ms2 = new Size(S(820), S(540));
+                if (MinimumSize != ms2) MinimumSize = ms2;
+            }
             ApplyMetrics();
 
             int y = S(8);
@@ -515,8 +553,9 @@ namespace MusicPlayer
 
             // ---- 顶栏：设置按钮先靠右，左侧按钮空间不足时自动收起次要项 ----
             btnSettings.Location = new Point(Math.Max(S(10), topBar.Width - btnSettings.Width - S(10)), y);
+            btnMiniToggle.Location = new Point(Math.Max(S(10), btnSettings.Left - btnMiniToggle.Width - gap), y);
             int searchMax = S(230), searchMin = S(120);
-            int searchRight = btnSettings.Left - S(10);
+            int searchRight = btnMiniToggle.Left - S(10);
 
             int x = S(10);
             btnAddFolder.Location = new Point(x, y); x += btnAddFolder.Width + gap;
@@ -611,6 +650,7 @@ namespace MusicPlayer
         // DPI 确定后重算所有固定尺寸（构造时按 96 DPI 算的会偏小，导致文字被裁）
         void ApplyMetrics()
         {
+            if (miniMode) return;
             if (topBar.Height != S(46)) topBar.Height = S(46);
             if (bottomBar.Height != S(108)) bottomBar.Height = S(108);
             if (statusBar.Height != S(26)) statusBar.Height = S(26);
@@ -620,6 +660,7 @@ namespace MusicPlayer
             SizeSize(btnRemove, 76, 30); SizeSize(btnClear, 76, 30);
             SizeSize(btnImport, 96, 30); SizeSize(btnExport, 96, 30);
             SizeSize(btnSortShuffle, 96, 30); SizeSize(btnSettings, 88, 30);
+            SizeSize(btnMiniToggle, 76, 30);
 
             SizeSize(btnPrev, 48, 40); SizeSize(btnStop, 48, 40);
             SizeSize(btnNext, 48, 40); SizeSize(btnMode, 48, 40);
@@ -1031,6 +1072,8 @@ namespace MusicPlayer
             list.Invalidate();
             UpdateNowPlayingUI(t);
             SaveStateSoon();
+            RestartIdleClock();          // 换歌后重新计“无操作”时间
+            if (miniMode) mini.RefreshFromHost();
         }
 
         void TogglePlay()
@@ -1208,6 +1251,7 @@ namespace MusicPlayer
             if (tray != null) tray.Text = Truncate("轻音播放器 - " + t.DisplayTitle, 62);
             LoadCoverAsync(t);
             SyncLyrics(t);
+            if (miniMode && mini != null && !mini.IsDisposed) mini.RefreshFromHost();
         }
 
         static string Truncate(string s, int n) { return s.Length <= n ? s : s.Substring(0, n); }
@@ -1257,10 +1301,13 @@ namespace MusicPlayer
             if (img != null) cover.Image = img;
             else cover.Image = PlaceholderImage(cover.Width);
             if (old != null) old.Dispose();
+            if (mini != null && !mini.IsDisposed)
+                mini.SetCover(img == null ? null : new Bitmap(img));
         }
 
         void UpdatePlayButton()
         {
+            if (miniMode && mini != null && !mini.IsDisposed) mini.RefreshFromHost();
             PlayState st = engine == null ? PlayState.Stopped : engine.State;
             bool playing = st == PlayState.Playing;
             btnPlay.Text = playing ? Glyphs.Pause : Glyphs.Play;
@@ -1317,6 +1364,7 @@ namespace MusicPlayer
                 if (keyData == (Keys.Control | Keys.F)) { txtSearch.Focus(); txtSearch.SelectAll(); return true; }
                 if (keyData == (Keys.Control | Keys.M)) { CycleMode(); return true; }
                 if (keyData == (Keys.Control | Keys.L)) { ToggleLyrics(); return true; }
+                if (keyData == (Keys.Control | Keys.D)) { ToggleMiniMode(); return true; }
                 if (keyData == (Keys.Control | Keys.S)) { StopPlay(); return true; }
                 if (keyData == (Keys.Control | Keys.Right)) { NextTrack(false); return true; }
                 if (keyData == (Keys.Control | Keys.Left)) { PrevTrack(); return true; }
@@ -1478,6 +1526,261 @@ namespace MusicPlayer
         // ================= 状态保存 =================
         void SaveStateSoon() { }
 
+        // ================= 迷你模式（播放中无操作自动收起） =================
+        void HookActivity(Control root)
+        {
+            root.MouseMove += delegate(object s, MouseEventArgs e) { MarkActivity(); };
+            root.MouseDown += delegate(object s, MouseEventArgs e) { MarkActivity(); };
+            root.MouseWheel += delegate(object s, MouseEventArgs e) { MarkActivity(); };
+            root.KeyDown += delegate(object s, KeyEventArgs e) { MarkActivity(); };
+            root.GotFocus += delegate(object s, EventArgs e) { MarkActivity(); };
+            foreach (Control c in root.Controls) HookActivity(c);
+        }
+
+        void MarkActivity()
+        {
+            lastUserAction = DateTime.Now;
+            if (miniMode && mini != null && !mini.IsDisposed) mini.SetExpanded(true);
+        }
+
+        // 由播放动作触发：重新开始计“无操作”时间
+        void RestartIdleClock()
+        {
+            lastUserAction = DateTime.Now;
+        }
+
+        void BuildMini()
+        {
+            if (mini != null) return;
+            mini = new MiniPlayerPanel(new MiniHost(this), T);
+            mini.Visible = false;
+            Controls.Add(mini);
+            mini.BringToFront();
+            mini.SetDpi(Sf);
+            mini.MouseEnter += delegate(object s, EventArgs e) { MarkActivity(); };
+            mini.MouseLeave += delegate(object s, EventArgs e) { if (miniMode) mini.SetExpanded(false); };
+            HookActivity(mini);
+        }
+
+        // 供迷你面板调用
+        class MiniHost : IMiniHost
+        {
+            MainForm f;
+            public MiniHost(MainForm form) { f = form; }
+            public void MiniToggleExpanded() { f.ToggleMiniMode(); }
+            public void MiniClose() { f.HideToTrayFromMini(); }
+            public string MiniTrackTitle { get { Track t = f.playlist.CurrentTrack; return t == null ? "未在播放" : t.DisplayTitle; } }
+            public string MiniTrackInfo
+            {
+                get
+                {
+                    Track t = f.playlist.CurrentTrack;
+                    if (t == null) return "双击列表中的歌曲开始播放";
+                    string s = t.DisplayArtist;
+                    if (!string.IsNullOrEmpty(t.Album)) s += "  ·  " + t.Album;
+                    return s;
+                }
+            }
+            public bool MiniIsPlaying { get { return f.engine != null && f.engine.State == PlayState.Playing; } }
+            public long MiniPositionMs { get { return f.engine == null ? 0 : f.engine.PositionMs; } }
+            public long MiniDurationMs
+            {
+                get
+                {
+                    long d = f.engine == null ? 0 : f.engine.DurationMs;
+                    if (d <= 0 && f.playlist.CurrentTrack != null) d = (long)(f.playlist.CurrentTrack.Duration * 1000);
+                    return d;
+                }
+            }
+            public int MiniVolume { get { return f.settings.Volume; } set { f.ApplyVolumeFromMini(value); } }
+            public void MiniSeekTo(double ratio) { f.SeekByRatio(ratio); }
+            public void MiniPrev() { f.PrevTrack(); }
+            public void MiniNext() { f.NextTrack(false); }
+            public void MiniPlayPause() { f.TogglePlay(); }
+            public void MiniOpenFull() { f.ExitMiniMode(); }
+            public void MiniDragFinished(Point p) { f.SaveMiniPosition(p); }
+            public void MiniSetAlwaysOnTop(bool on) { f.SetMiniTopMost(on); }
+            public bool MiniAlwaysOnTop { get { return f.miniTopMost; } }
+        }
+
+        void ApplyVolumeFromMini(int v)
+        {
+            settings.Volume = Settings.Clamp(v, 0, 100);
+            if (engine != null) engine.Volume = settings.Volume;
+            if (volBar != null) volBar.Value = settings.Volume;
+            if (lblVolume != null) lblVolume.Text = settings.Volume + "%";
+            settings.Save(configPath);
+        }
+
+        void SeekByRatio(double r)
+        {
+            if (engine == null) return;
+            long dur = engine.DurationMs;
+            if (dur <= 0 && playlist.CurrentTrack != null) dur = (long)(playlist.CurrentTrack.Duration * 1000);
+            if (dur <= 0) return;
+            engine.PositionMs = (long)(dur * Math.Max(0, Math.Min(1, r)));
+        }
+
+        void SaveMiniPosition(Point p)
+        {
+            // 迷你窗位置以“收起后的目标位置”为准
+            Screen sc = Screen.FromPoint(p);
+            Rectangle wa = sc.WorkingArea;
+            int w = mini.Width;
+            bool nearRight = wa.Right - (p.X + w) < S(40);
+            bool nearTop = p.Y - wa.Top < S(40);
+            if (nearRight) { settings.MiniCorner = true; settings.MiniX = -1; }
+            else { settings.MiniCorner = false; settings.MiniX = p.X; }
+            settings.MiniY = nearTop ? -1 : p.Y;
+            settings.Save(configPath);
+        }
+
+        void SetMiniTopMost(bool on)
+        {
+            miniTopMost = on;
+            mini.ApplyTargetLocation(mini.Location);
+            TopMost = true;   // 迷你窗始终置顶，避免被其他窗口遮挡
+            if (mini != null) mini.RefreshFromHost();
+        }
+
+        void CheckIdle()
+        {
+            if (settings == null) return;
+            if (miniMode)
+            {
+                // 迷你态：鼠标离开一段时间后自动缩起，只留一条边
+                if (mini != null && !mini.IsDisposed && !mini.Bounds.Contains(Cursor.Position))
+                {
+                    if ((DateTime.Now - lastUserAction).TotalSeconds >= 3) mini.SetExpanded(false);
+                }
+                if (mini != null) mini.RefreshFromHost();
+                return;
+            }
+            // 正常态：播放中且长时间无操作 → 自动收起到右上角
+            if (!settings.MiniAuto) return;
+            // 手动还原后给一段冷静期，避免刚点开又被收走（首次自动收起不受影响）
+            if (restoredAt != DateTime.MinValue && (DateTime.Now - restoredAt).TotalSeconds < Math.Max(15, settings.MiniIdleSeconds + 5)) return;
+            if (engine == null || !engine.HasTrack || engine.State != PlayState.Playing) return;
+            if (WindowState == FormWindowState.Minimized) return;
+            if (!Visible) return;
+            double idle = (DateTime.Now - lastUserAction).TotalSeconds;
+            if (idle >= settings.MiniIdleSeconds) EnterMiniMode(true);
+        }
+
+        Point MiniTargetLocation()
+        {
+            Rectangle wa = Screen.PrimaryScreen.WorkingArea;
+            int w = S(300), h = S(150);
+            int x, y;
+            if (settings.MiniCorner || settings.MiniX < 0) x = wa.Right - w - S(16);
+            else x = settings.MiniX;
+            if (settings.MiniY < 0) y = wa.Top + S(16);
+            else y = settings.MiniY;
+            // 保证不跑到屏幕外
+            if (x + w > wa.Right) x = wa.Right - w - S(8);
+            if (x < wa.Left) x = wa.Left + S(8);
+            if (y + h > wa.Bottom) y = wa.Bottom - h - S(8);
+            if (y < wa.Top) y = wa.Top + S(8);
+            return new Point(x, y);
+        }
+
+        void EnterMiniMode(bool automatic)
+        {
+            if (miniMode || mini == null) return;
+            // 记住正常态窗口位置，供还原
+            restoreMaximized = (WindowState == FormWindowState.Maximized);
+            restoreBoundsLoc = restoreMaximized ? RestoreBounds.Location : Location;
+            restoreBoundsSize = restoreMaximized ? RestoreBounds.Size : Size;
+            if (restoreMaximized) WindowState = FormWindowState.Normal;
+
+            miniMode = true;
+            miniSince = DateTime.Now;
+            if (settings.LyricsEnabled && lyricsForm != null && !lyricsForm.IsDisposed) lyricsForm.Hide();
+
+            int mw = S(300), mh = S(150);
+            Point target = MiniTargetLocation();
+
+            // 1) 先隐藏主窗体的所有内容（不要用 SuspendLayout/ResumeLayout：
+            //    AutoScaleMode 会在 ResumeLayout 时把窗体按自动缩放重新撑回原尺寸）
+            list.Visible = false;
+            topBar.Visible = false;
+            statusBar.Visible = false;
+            bottomBar.Visible = false;
+
+            // 2) 主窗体本身缩成迷你尺寸并移到目标位置，迷你面板铺满整个客户区
+            //    注意顺序：必须先解除最小尺寸约束，否则窗体会被顶回 820x540
+            MinimumSize = Size.Empty;
+            MaximumSize = Size.Empty;
+            FormBorderStyle = FormBorderStyle.None;
+            StartPosition = FormStartPosition.Manual;
+            Bounds = new Rectangle(target, new Size(mw, mh));
+            BackColor = Color.FromArgb(24, 25, 29);
+
+            mini.Dock = DockStyle.Fill;
+            mini.Visible = true;
+            mini.SetDpi(Sf);
+            mini.SetCover(coverImage == null ? null : new Bitmap(coverImage));
+            mini.SetExpanded(false);
+            mini.ApplyTargetLocation(Location);
+            mini.RefreshFromHost();
+            mini.BringToFront();
+
+            TopMost = true;
+            SetStatus(automatic ? "已自动收起为迷你窗（双击还原）" : "已进入迷你模式");
+        }
+
+        void ExitMiniMode()
+        {
+            if (!miniMode) return;
+            miniMode = false;
+
+            if (mini != null && !mini.IsDisposed) { mini.Visible = false; mini.Dock = DockStyle.None; }
+
+            // 恢复成普通窗口（顺序很关键：先恢复边框与最小尺寸，再给回正常尺寸）
+            FormBorderStyle = FormBorderStyle.Sizable;
+            TopMost = false;
+            MaximumSize = Size.Empty;
+            MinimumSize = new Size(S(820), S(540));
+            list.Visible = true;
+            topBar.Visible = true;
+            statusBar.Visible = true;
+            bottomBar.Visible = true;
+            BackColor = T.Window;
+
+            Size restore = (restoreBoundsSize.Width > 200) ? restoreBoundsSize : new Size(S(1080), S(680));
+            ClientSize = restore;
+            if (restoreBoundsLoc.X != 0 || restoreBoundsLoc.Y != 0) Location = restoreBoundsLoc;
+            if (restoreMaximized) WindowState = FormWindowState.Maximized;
+
+            if (settings.LyricsEnabled) { EnsureLyrics(); lyricsForm.SetTrack(playlist.CurrentTrack); lyricsForm.Show(); }
+            LayoutAll();
+            BringToFront();
+            Activate();
+            lastUserAction = DateTime.Now;
+            miniSince = DateTime.Now;
+            restoredAt = DateTime.Now;     // 手动还原 → 冷静期开始
+            SetStatus("已展开完整播放器");
+            settings.Save(configPath);
+        }
+
+        void ToggleMiniMode()
+        {
+            if (miniMode) ExitMiniMode(); else EnterMiniMode(false);
+        }
+
+        void HideToTrayFromMini()
+        {
+            if (miniMode) ExitMiniMode();
+            Hide();
+            tray.ShowBalloonTip(2000, "轻音播放器", "已最小化到托盘，双击图标可以恢复", ToolTipIcon.Info);
+        }
+
+        internal void OnMiniPositionChanged()
+        {
+            if (miniMode) settings.Save(configPath);
+        }
+
+
         // ================= 桌面歌词 =================
         void EnsureLyrics()
         {
@@ -1629,6 +1932,7 @@ namespace MusicPlayer
 
         void OnFormClosing(object s, FormClosingEventArgs e)
         {
+            if (miniMode && e.CloseReason != CloseReason.UserClosing) ExitMiniMode();
             if (!allowClose && settings.MinimizeToTrayInstead && e.CloseReason == CloseReason.UserClosing)
             {
                 e.Cancel = true;
@@ -1640,6 +1944,7 @@ namespace MusicPlayer
             try { if (lyricsForm != null && !lyricsForm.IsDisposed) { lyricsForm.Close(); lyricsForm.Dispose(); } } catch { }
             try { engine.Stop(); engine.Dispose(); } catch { }
             if (timer != null) timer.Stop();
+            if (miniTick != null) miniTick.Stop();
             if (tray != null) { tray.Visible = false; tray.Dispose(); }
         }
     }

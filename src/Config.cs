@@ -258,6 +258,10 @@ namespace MusicPlayer
         public bool LyricsLocked = false;
         public int LyricsX = -1, LyricsY = -1;
         public int WindowX = -1, WindowY = -1, WindowW = 1080, WindowH = 680;
+        public bool MiniAuto = true;               // 播放时无操作自动收起为迷你窗
+        public int MiniIdleSeconds = 20;           // 判定“无操作”的秒数
+        public bool MiniCorner = true;             // 收起时贴到屏幕右上角
+        public int MiniX = -1, MiniY = -1;         // 迷你窗位置（-1 表示右上角）
         public string LastTrack = "";
         public long LastPositionMs = 0;
         public List<string> LastPlaylist = new List<string>();
@@ -308,6 +312,11 @@ namespace MusicPlayer
                 s.WindowY = Json.GetInt(d, "winY", -1);
                 s.WindowW = Json.GetInt(d, "winW", 1080);
                 s.WindowH = Json.GetInt(d, "winH", 680);
+                s.MiniAuto = Json.GetBool(d, "miniAuto", s.MiniAuto);
+                s.MiniIdleSeconds = Clamp(Json.GetInt(d, "miniIdle", s.MiniIdleSeconds), 3, 3600);
+                s.MiniCorner = Json.GetBool(d, "miniCorner", s.MiniCorner);
+                s.MiniX = Json.GetInt(d, "miniX", -1);
+                s.MiniY = Json.GetInt(d, "miniY", -1);
                 s.LastTrack = Json.GetStr(d, "lastTrack", "");
                 s.LastPositionMs = Json.GetLong(d, "lastPos", 0);
                 s.LastPlaylist = Json.GetStrList(d, "lastPlaylist");
@@ -350,6 +359,11 @@ namespace MusicPlayer
                 d["winY"] = WindowY;
                 d["winW"] = WindowW;
                 d["winH"] = WindowH;
+                d["miniAuto"] = MiniAuto;
+                d["miniIdle"] = MiniIdleSeconds;
+                d["miniCorner"] = MiniCorner;
+                d["miniX"] = MiniX;
+                d["miniY"] = MiniY;
                 d["lastTrack"] = LastTrack;
                 d["lastPos"] = LastPositionMs;
                 d["lastPlaylist"] = LastPlaylist;
