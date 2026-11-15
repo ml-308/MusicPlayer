@@ -1540,7 +1540,6 @@ namespace MusicPlayer
         void MarkActivity()
         {
             lastUserAction = DateTime.Now;
-            if (miniMode && mini != null && !mini.IsDisposed) mini.SetExpanded(true);
         }
 
         // 由播放动作触发：重新开始计“无操作”时间
@@ -1558,7 +1557,6 @@ namespace MusicPlayer
             mini.BringToFront();
             mini.SetDpi(Sf);
             mini.MouseEnter += delegate(object s, EventArgs e) { MarkActivity(); };
-            mini.MouseLeave += delegate(object s, EventArgs e) { if (miniMode) mini.SetExpanded(false); };
             HookActivity(mini);
         }
 
@@ -1648,12 +1646,8 @@ namespace MusicPlayer
             if (settings == null) return;
             if (miniMode)
             {
-                // 迷你态：鼠标离开一段时间后自动缩起，只留一条边
-                if (mini != null && !mini.IsDisposed && !mini.Bounds.Contains(Cursor.Position))
-                {
-                    if ((DateTime.Now - lastUserAction).TotalSeconds >= 3) mini.SetExpanded(false);
-                }
-                if (mini != null) mini.RefreshFromHost();
+                // 迷你态只刷新显示；不再根据鼠标位置反复切换，避免窗口抖动/爆闪
+                if (mini != null && !mini.IsDisposed) mini.RefreshFromHost();
                 return;
             }
             // 正常态：播放中且长时间无操作 → 自动收起到右上角

@@ -1,12 +1,12 @@
 ; 轻音播放器 · 安装程序（Inno Setup 6）
 ; 页面结构与选项由 common.iss 统一提供；这里只声明应用身份与要安装的文件。
-; 构建：installer\build-setup.cmd   产物：dist\MusicPlayer-Setup-1.3.0.exe
+; 构建：installer\build-setup.cmd   产物：dist\MusicPlayer-Setup-1.3.1.exe
 
 #define AppName "轻音播放器"
 #define AppSlug "MusicPlayer"
 ; 沿用旧安装器的目录（升级不换位置），避免出现两份安装
 #define DirName "LightMusicPlayer"
-#define AppVersion "1.3.0"
+#define AppVersion "1.3.1"
 #define AppId "{{3B7E2C41-6D18-4A2F-B953-8E0C5A71D264}"
 #define AppExe "MusicPlayer.exe"
 #define AppRepo "MusicPlayer"

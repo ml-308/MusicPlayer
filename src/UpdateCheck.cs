@@ -46,7 +46,7 @@ namespace UpdateKit
         public const string AppName = "轻音播放器";
         public const string Owner = "ml-308";
         public const string RepoSlug = "MusicPlayer";
-        public const string CurrentVersion = "1.3.0";
+        public const string CurrentVersion = "1.3.1";
 
         public const string AppUrl = "https://github.com/" + Owner + "/" + RepoSlug;
         public const string ReleasesUrl = AppUrl + "/releases";

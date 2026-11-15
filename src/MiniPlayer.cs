@@ -45,12 +45,8 @@ namespace MusicPlayer
         MiniButton btnPrev, btnPlay, btnNext, btnVolume, btnFull, btnTop, btnClose;
         Image coverImage;
 
-        bool expanded = false;      // 是否展开（鼠标悬停展开）
+        bool expanded = false;
         Point targetLocation = Point.Empty;
-        Point hiddenLocation = Point.Empty;
-        Rectangle collapseTo = Rectangle.Empty;
-        System.Windows.Forms.Timer slideTimer;
-        int slideStep;
 
         int S(int v) { return (int)Math.Round(v * (Sf / 96.0)); }
 
@@ -132,9 +128,7 @@ namespace MusicPlayer
             Controls.Add(btnFull);
             Controls.Add(btnClose);
 
-            slideTimer = new System.Windows.Forms.Timer();
-            slideTimer.Interval = 16;
-            slideTimer.Tick += delegate(object s, EventArgs e) { SlideStep(); };
+            HookDrag(this);
         }
 
         Label MakeLabel()
@@ -148,6 +142,71 @@ namespace MusicPlayer
             return l;
         }
 
+        // ---------------- 拖动整个迷你窗 ----------------
+        bool dragging = false;
+        Point dragOriginCursor;
+        Point dragOriginForm;
+
+        void BeginDrag()
+        {
+            Form f = FindForm();
+            if (f == null) return;
+            dragging = true;
+            dragOriginCursor = Cursor.Position;
+            dragOriginForm = f.Location;
+        }
+
+        void UpdateDrag()
+        {
+            if (!dragging) return;
+            Form f = FindForm();
+            if (f == null) { dragging = false; return; }
+            Point p = Cursor.Position;
+            f.Location = new Point(dragOriginForm.X + (p.X - dragOriginCursor.X),
+                                   dragOriginForm.Y + (p.Y - dragOriginCursor.Y));
+        }
+
+        void EndDrag()
+        {
+            if (!dragging) return;
+            dragging = false;
+            Form f = FindForm();
+            if (f != null && host != null) host.MiniDragFinished(f.Location);
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left) { BeginDrag(); }
+            base.OnMouseDown(e);
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            if (dragging) UpdateDrag();
+            base.OnMouseMove(e);
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            if (dragging) EndDrag();
+            base.OnMouseUp(e);
+        }
+
+        // 让所有子控件（标题、封面、按钮之间的空白等）也能拖动
+        void HookDrag(Control root)
+        {
+            foreach (Control c in root.Controls)
+            {
+                if (c is MiniSeekBar || c is MiniButton) continue;   // 进度条/按钮保留自身交互
+                Control cc = c;
+                cc.MouseDown += delegate(object s, MouseEventArgs e) { if (e.Button == MouseButtons.Left) BeginDrag(); };
+                cc.MouseMove += delegate(object s, MouseEventArgs e) { if (dragging) UpdateDrag(); };
+                cc.MouseUp += delegate(object s, MouseEventArgs e) { if (dragging) EndDrag(); };
+                if (cc.Cursor == Cursors.Default) cc.Cursor = Cursors.SizeAll;
+                HookDrag(cc);
+            }
+        }
+
         // ---------------- 布局 ----------------
         public void SetDpi(int dpi)
         {
@@ -155,55 +214,20 @@ namespace MusicPlayer
             LayoutChildren();
         }
 
+        // 迷你窗是固定尺寸的小窗：不做滑入/滑出动画（旧版本这里会启动一个
+        // 永不停止的 16ms 定时器反复设置 Location，表现为整窗爆闪）
         public void ApplyTargetLocation(Point target)
         {
             targetLocation = target;
-            int w = Width;
-            Rectangle wa = Screen.FromPoint(target).WorkingArea;
-            int edge = target.X + w;
-            int top = target.Y;
-            bool nearRight = wa.Right - edge < S(8);
-            bool nearTop = top - wa.Top < S(8);
-            int gap = S(8);
-            // 不再隐藏到屏幕边缘（窗口本身很小），展开/收起只控制鼠标悬停时的轻微提亮
-            hiddenLocation = target;
-            if (!expanded)
-            {
-                Location = target;
-                if (slideTimer.Enabled) slideTimer.Stop();
-            }
+            // 仅在没有拖动时同步窗口位置，避免与用户拖动互相拉扯
+            if (!dragging) Location = target;
         }
 
+        // 保留接口但不再做任何滑动动画
         public void SetExpanded(bool want)
         {
-            if (expanded == want) return;
             expanded = want;
-            StartSlide(want);
             if (want) BringToFront();
-        }
-
-        void StartSlide(bool show)
-        {
-            slideStep = show ? 1 : -1;
-            if (!slideTimer.Enabled) slideTimer.Start();
-        }
-
-        void SlideStep()
-        {
-            int speed = S(26);
-            Point now = Location;
-            Point goal = expanded ? targetLocation : hiddenLocation;
-            int dx = goal.X - now.X;
-            int dy = goal.Y - now.Y;
-            if (Math.Abs(dx) <= speed && Math.Abs(dy) <= speed)
-            {
-                Location = goal;
-                slideTimer.Stop();
-                return;
-            }
-            int nx = now.X + Math.Sign(dx) * Math.Min(Math.Abs(dx), speed);
-            int ny = now.Y + Math.Sign(dy) * Math.Min(Math.Abs(dy), speed);
-            Location = new Point(nx, ny);
         }
 
         void LayoutChildren()
